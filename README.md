@@ -32,11 +32,14 @@ Unrelated2     (fully isolated)
 
 ```bash
 dotnet tool restore
-./run-scenarios.sh                    # all scenarios
+./run-scenarios.sh                        # all scenarios, both tools
 ./run-scenarios.sh resx-at-project-root   # one scenario
+TOOLS=incrementalist ./run-scenarios.sh   # one tool only
 ```
 
-Each scenario resets to `dev`, applies a scripted change, optionally commits it, runs `incrementalist run --dry`, and diffs the result against the expectation. Output lands in `.scenario-output/`.
+Each scenario resets to `dev`, applies a scripted change, optionally commits it, runs both detectors, and diffs each result against the expectation. Output lands in `.scenario-output/`.
+
+> **Note:** the runner resets the working tree before every scenario, so it must be committed before you run it. An uncommitted edit to `run-scenarios.sh` gets reverted mid-run by `reset_to_base`.
 
 ## Scenarios
 
@@ -77,15 +80,66 @@ Read from Incrementalist 1.2.2 source, then **verified by running the suite**. T
 
 - **`ProjectImportsFinder` only reads `//Import` nodes.** Misses `ImportGroup`, `Sdk` attribute imports, and the implicit `Directory.Build.props` auto-import. No scenario covers this yet.
 
-## Current status against Incrementalist 1.2.2
+## Current status against Incrementalist 1.2.2 and dotnet-affected 7.0.1
 
 ```
-7 passed, 6 failed
+SCENARIO                        incrementalist    dotnet-affected
+--------------------------------------------------------------------
+resx-at-project-root            FAIL              PASS
+resx-nested-two-levels          FAIL              PASS
+resx-one-level-deep             PASS              PASS
+additional-file                 FAIL              PASS
+slnx-edited                     PASS              FAIL
+directory-build-targets         FAIL              PASS
+unstaged-deletion               FAIL              PASS
+committed-deletion              FAIL              PASS
+csproj-property-change          PASS              PASS
+props-imported-by-two           PASS              PASS
+global-json                     PASS              FAIL
+pipeline-yaml-only              PASS              PASS
+empty-diff                      PASS              PASS
+
+TOTALS                          7 pass / 6 fail   11 pass / 2 fail
 ```
 
-Failing: `resx-at-project-root`, `resx-nested-two-levels`, `additional-file`, `directory-build-targets`, `unstaged-deletion`, `committed-deletion`.
+Neither tool is correct. They fail on **disjoint** sets of scenarios, which is the most useful thing this suite produces.
 
-Every failure is a **false negative** — Incrementalist reports zero affected projects when work is genuinely needed. That is the dangerous direction: a skipped build ships stale code. None of the six are false positives.
+### Incrementalist's six failures — all false negatives
+
+Every one reports **zero** affected projects when work is genuinely needed. That is the dangerous direction: a skipped build ships stale code.
+
+1. `resx-at-project-root` — `.resx` in the project directory
+2. `resx-nested-two-levels` — `.resx` in `Resources/en-US/`
+3. `additional-file` — `appsettings.json` as `AdditionalFiles`
+4. `directory-build-targets` — `Directory.Build.targets`
+5. `unstaged-deletion` — source file deleted, not staged
+6. `committed-deletion` — source file deleted and committed
+
+### dotnet-affected's two failures — also false negatives
+
+1. `slnx-edited` — editing the `.slnx` solution file returns nothing. Verified independently: `dotnet-affected --from dev` reports "No affected projects where found" after a committed `.slnx` change.
+2. `global-json` — editing `global.json` returns nothing. Same independent verification.
+
+Both are solution-wide files that dotnet-affected does not treat as global triggers. Incrementalist handles both correctly.
+
+### Where each tool wins
+
+| Concern | Winner |
+|---|---|
+| Resource files (`.resx`) at any depth | dotnet-affected |
+| `AdditionalFiles` items | dotnet-affected |
+| `Directory.Build.targets` | dotnet-affected |
+| File deletions (staged or committed) | dotnet-affected |
+| `.slnx` solution file changes | Incrementalist |
+| `global.json` changes | Incrementalist |
+| `.csproj` property changes | tie |
+| Props imported by a subset of projects | tie |
+| Non-code files (CI YAML) | tie |
+| Empty diff | tie |
+
+## A note on fairness
+
+The harness runs dotnet-affected with `--uncommitted all`, matching Incrementalist's `DiffHelper.ChangedFiles`, which includes staged, unstaged and untracked changes on top of the branch diff. Running it with `--uncommitted none` would hide working-tree changes from dotnet-affected and make the `unstaged-deletion` comparison meaningless. An earlier version of this harness made exactly that mistake.
 
 
 ## License
