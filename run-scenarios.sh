@@ -63,7 +63,10 @@ run_tool() {
     dotnet-affected)
       local da_dir="$OUT_DIR/.da"
       rm -rf "$da_dir"; mkdir -p "$da_dir"
-      dotnet dotnet-affected --from "$BASE_BRANCH" --uncommitted none \
+      # --uncommitted all matches Incrementalist's behavior: DiffHelper.ChangedFiles
+      # includes staged, unstaged and untracked changes on top of the branch diff.
+      # Using `none` here would unfairly hide working-tree changes from dotnet-affected.
+      dotnet dotnet-affected --from "$BASE_BRANCH" --uncommitted all \
         --format text --output-dir "$da_dir" --output-name affected >"$log" 2>&1
       local rc=$?
       # 166 means "nothing is affected" -- a valid empty result, not an error.
