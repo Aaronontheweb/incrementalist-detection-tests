@@ -56,14 +56,14 @@
     },
     {
       "name": "slnx-edited",
-      "description": "The solution file itself changed. Incrementalist supports .slnx since 1.2.0 but AlwaysSolutionWideExtensions only lists .sln.",
+      "description": "The solution file itself changed. PASSES, but not via AlwaysSolutionWideExtensions (which only lists .sln). The solution file is in the solution's own file list, so ComputeDependencyGraphCmd's explicit 'solution file modified' special case returns all projects.",
       "change": "printf '\\n' >> DetectionTests.slnx",
       "commit": true,
       "expected": "FULL"
     },
     {
       "name": "directory-build-targets",
-      "description": "Directory.Build.targets is auto-imported into every project, so editing it affects the whole solution. Only Directory.Build.props is in the solution-wide list.",
+      "description": "Directory.Build.targets is auto-imported into every project, so editing it affects the whole solution. It is silently dropped: not in the solution's file list, not in a project subfolder, and not an explicit Import. Result is zero affected files -- a false negative, not a false positive.",
       "change": "printf '\\n' >> Directory.Build.targets",
       "commit": true,
       "expected": "FULL"
@@ -103,7 +103,7 @@
     },
     {
       "name": "props-imported-by-two",
-      "description": "A props file explicitly imported by exactly two projects. Correct answer is those two plus their dependents -- NOT a full solution build. IsWidelyImportedFile returns true for any file with more than one dependent project.",
+      "description": "A props file explicitly imported by exactly two projects. PASSES, but for an accidental reason: props files never survive into the affected-file set (they are replaced by the projects that import them), so SolutionWideChangeDetector.IsWidelyImportedFile is unreachable for them. That makes the over-trigger branch dead code rather than a live bug.",
       "change": "printf '\\n' >> build/common.props",
       "commit": true,
       "expected": [

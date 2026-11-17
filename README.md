@@ -47,8 +47,7 @@ Each scenario resets to `dev`, applies a scripted change, optionally commits it,
 | `resx-one-level-deep` | `.resx` in `Resources/` (control) | Core + dependents |
 | `additional-file` | `appsettings.json` as `AdditionalFiles` | App only |
 | `slnx-edited` | `.slnx` touched | full solution |
-| `directory-build-targets` | `Directory.Build.targets` touched | full solution |
-| `unstaged-deletion` | source file deleted, not staged | Core + dependents |
+| `directory-build-targets` | `Directory.Build.targets` touched | full solution || `unstaged-deletion` | source file deleted, not staged | Core + dependents |
 | `committed-deletion` | source file deleted and committed | Core + dependents |
 | `csproj-property-change` | property added to a leaf `.csproj` | that project only |
 | `props-imported-by-two` | `build/common.props` touched | Core, Unrelated + dependents |
@@ -58,17 +57,36 @@ Each scenario resets to `dev`, applies a scripted change, optionally commits it,
 
 ## Known gaps these scenarios target
 
-Read from Incrementalist 1.2.2 source:
+Read from Incrementalist 1.2.2 source, then **verified by running the suite**. Two of the source-reading predictions were wrong; the corrections are noted.
 
-1. **`.slnx` is not solution-wide.** `SolutionWideChangeDetector.AlwaysSolutionWideExtensions` contains only `.sln`, despite `.slnx` support landing in 1.2.0.
-2. **`Directory.Build.targets` is not solution-wide.** The list is `Directory.Build.props`, `Directory.Packages.props`, `global.json`, `nuget.config`.
-3. **`AdditionalDocuments` are never enumerated.** `WorkspaceProject.Documents` only pulls Roslyn `Documents` (source files), so `AdditionalFiles` items are invisible.
-4. **Resource files at the project root are missed.** `FilterAffectedProjectFilesCmd.TryFindSubFolder` enumerates *immediate subdirectories* of each project folder. A file directly in the project directory never matches, and neither does anything two levels deep.
-5. **Unstaged deletions are dropped.** `DiffHelper.ChangedFiles` enumerates `status.Modified`, `status.Added`, `status.Untracked` — never `status.Deleted`.
-6. **`IsWidelyImportedFile` over-triggers.** A props file imported by 2 of 50 projects forces a *full solution* build instead of just those 2 plus dependents.
-7. **`ProjectImportsFinder` only reads `//Import` nodes.** Misses `ImportGroup`, `Sdk` attribute imports, and the implicit `Directory.Build.props` auto-import.
+### Confirmed failures (6)
 
-Scenarios 1–6 should fail against 1.2.2. That is the point: this is a failing test suite that documents the gaps, and each fix turns one red.
+1. **Resource files at the project root are missed.** `FilterAffectedProjectFilesCmd.TryFindSubFolder` enumerates *immediate subdirectories* of each project folder. A file directly in the project directory never matches. `resx-at-project-root` returns **zero** affected projects.
+2. **Resource files two levels deep are missed.** Same heuristic. `resx-nested-two-levels` (`Resources/en-US/Strings.resx`) also returns **zero**. The one-level-deep control (`Resources/Strings.resx`) passes, which pins the bug precisely to the depth of the folder walk.
+3. **`AdditionalDocuments` are never enumerated.** `WorkspaceProject.Documents` only pulls Roslyn `Documents` (source files), so `AdditionalFiles` items are invisible. `additional-file` returns **zero**.
+4. **`Directory.Build.targets` is silently dropped.** It is not in the solution's file list, not inside a project subfolder, and not an explicit `<Import>`. `directory-build-targets` returns **zero** affected projects — a false negative on a file that MSBuild auto-imports into every project.
+5. **Unstaged deletions are dropped.** `DiffHelper.ChangedFiles` enumerates `status.Modified`, `status.Added`, `status.Untracked` — never `status.Deleted`. `unstaged-deletion` returns **zero**.
+6. **Committed deletions are dropped.** Same root cause, and it survives the commit. `committed-deletion` returns **zero**.
+
+### Predictions that were wrong
+
+- **`.slnx` is fine.** I predicted `slnx-edited` would fail because `AlwaysSolutionWideExtensions` only lists `.sln`. It passes: the solution file is in the solution's own file list, so `ComputeDependencyGraphCmd`'s explicit "solution file modified" special case returns all projects. The extension list is still incomplete, but this path doesn't depend on it.
+- **`IsWidelyImportedFile` over-triggering is dead code, not a live bug.** I predicted `props-imported-by-two` would force a full solution build. It doesn't: props files never survive into the affected-file set, because `FilterAffectedProjectFilesCmd` replaces them with the projects that import them. The over-trigger branch is unreachable for the case it was written for.
+
+### Still unverified
+
+- **`ProjectImportsFinder` only reads `//Import` nodes.** Misses `ImportGroup`, `Sdk` attribute imports, and the implicit `Directory.Build.props` auto-import. No scenario covers this yet.
+
+## Current status against Incrementalist 1.2.2
+
+```
+7 passed, 6 failed
+```
+
+Failing: `resx-at-project-root`, `resx-nested-two-levels`, `additional-file`, `directory-build-targets`, `unstaged-deletion`, `committed-deletion`.
+
+Every failure is a **false negative** — Incrementalist reports zero affected projects when work is genuinely needed. That is the dangerous direction: a skipped build ships stale code. None of the six are false positives.
+
 
 ## License
 
