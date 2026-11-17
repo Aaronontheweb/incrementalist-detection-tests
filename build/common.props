@@ -1,0 +1,13 @@
+<Project>
+  <!--
+    Explicitly imported by Core.csproj and Unrelated.csproj only.
+
+    Scenario `props-imported-by-two` asserts that changing this file affects exactly those two
+    projects plus their dependents, and NOT the whole solution. Incrementalist's
+    SolutionWideChangeDetector.IsWidelyImportedFile returns true for any props file imported by
+    more than one project, which forces a full solution build here.
+  -->
+  <PropertyGroup>
+    <CommonProp>1</CommonProp>
+  </PropertyGroup>
+</Project>

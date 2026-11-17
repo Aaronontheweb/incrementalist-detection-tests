@@ -1,0 +1,139 @@
+{
+  "projects": [
+    "src/Core/Core.csproj",
+    "src/Shared/Shared.csproj",
+    "src/App/App.csproj",
+    "src/Other/Other.csproj",
+    "src/Unrelated/Unrelated.csproj",
+    "src/Unrelated2/Unrelated2.csproj",
+    "src/Core.Tests/Core.Tests.csproj"
+  ],
+  "scenarios": [
+    {
+      "name": "resx-at-project-root",
+      "description": "A .resx sitting directly in the project directory. MSBuild compiles it into the assembly, so the owning project and everything downstream must rebuild.",
+      "change": "sed -i 's/Hello/Hello2/' src/Core/Strings.resx",
+      "commit": true,
+      "expected": [
+        "src/Core/Core.csproj",
+        "src/Shared/Shared.csproj",
+        "src/App/App.csproj",
+        "src/Core.Tests/Core.Tests.csproj"
+      ]
+    },
+    {
+      "name": "resx-nested-two-levels",
+      "description": "A localized .resx two directories below the project root (Resources/en-US/). Same expectation as the root-level case.",
+      "change": "sed -i 's/Hello/Hello2/' src/Core/Resources/en-US/Strings.resx",
+      "commit": true,
+      "expected": [
+        "src/Core/Core.csproj",
+        "src/Shared/Shared.csproj",
+        "src/App/App.csproj",
+        "src/Core.Tests/Core.Tests.csproj"
+      ]
+    },
+    {
+      "name": "resx-one-level-deep",
+      "description": "Control case: a .resx exactly one directory below the project root. Incrementalist's TryFindSubFolder heuristic should catch this one.",
+      "change": "sed -i 's/Hello/Hello2/' src/Core/Resources/Strings.resx",
+      "commit": true,
+      "expected": [
+        "src/Core/Core.csproj",
+        "src/Shared/Shared.csproj",
+        "src/App/App.csproj",
+        "src/Core.Tests/Core.Tests.csproj"
+      ]
+    },
+    {
+      "name": "additional-file",
+      "description": "appsettings.json registered as an AdditionalFiles item. Roslyn exposes these as AdditionalDocuments, which Incrementalist never enumerates.",
+      "change": "sed -i 's/Information/Debug/' src/App/appsettings.json",
+      "commit": true,
+      "expected": [
+        "src/App/App.csproj"
+      ]
+    },
+    {
+      "name": "slnx-edited",
+      "description": "The solution file itself changed. Incrementalist supports .slnx since 1.2.0 but AlwaysSolutionWideExtensions only lists .sln.",
+      "change": "printf '\\n' >> DetectionTests.slnx",
+      "commit": true,
+      "expected": "FULL"
+    },
+    {
+      "name": "directory-build-targets",
+      "description": "Directory.Build.targets is auto-imported into every project, so editing it affects the whole solution. Only Directory.Build.props is in the solution-wide list.",
+      "change": "printf '\\n' >> Directory.Build.targets",
+      "commit": true,
+      "expected": "FULL"
+    },
+    {
+      "name": "unstaged-deletion",
+      "description": "A source file deleted but not staged. DiffHelper.ChangedFiles enumerates Modified/Added/Untracked but never status.Deleted.",
+      "change": "rm src/Core/Thing.cs",
+      "commit": false,
+      "expected": [
+        "src/Core/Core.csproj",
+        "src/Shared/Shared.csproj",
+        "src/App/App.csproj",
+        "src/Core.Tests/Core.Tests.csproj"
+      ]
+    },
+    {
+      "name": "committed-deletion",
+      "description": "A source file deleted and committed. Same expectation as the unstaged case.",
+      "change": "rm src/Core/Thing.cs",
+      "commit": true,
+      "expected": [
+        "src/Core/Core.csproj",
+        "src/Shared/Shared.csproj",
+        "src/App/App.csproj",
+        "src/Core.Tests/Core.Tests.csproj"
+      ]
+    },
+    {
+      "name": "csproj-property-change",
+      "description": "A property added to a leaf .csproj. Only that project needs rebuilding.",
+      "change": "sed -i 's|<Nullable>enable</Nullable>|<Nullable>enable</Nullable>\\n    <Description>changed</Description>|' src/Unrelated2/Unrelated2.csproj",
+      "commit": true,
+      "expected": [
+        "src/Unrelated2/Unrelated2.csproj"
+      ]
+    },
+    {
+      "name": "props-imported-by-two",
+      "description": "A props file explicitly imported by exactly two projects. Correct answer is those two plus their dependents -- NOT a full solution build. IsWidelyImportedFile returns true for any file with more than one dependent project.",
+      "change": "printf '\\n' >> build/common.props",
+      "commit": true,
+      "expected": [
+        "src/Core/Core.csproj",
+        "src/Shared/Shared.csproj",
+        "src/App/App.csproj",
+        "src/Core.Tests/Core.Tests.csproj",
+        "src/Unrelated/Unrelated.csproj"
+      ]
+    },
+    {
+      "name": "global-json",
+      "description": "SDK pin changed. Affects every project in the solution.",
+      "change": "printf '\\n' >> global.json",
+      "commit": true,
+      "expected": "FULL"
+    },
+    {
+      "name": "pipeline-yaml-only",
+      "description": "Only a CI workflow file changed. No project's compiled output is affected, so nothing should rebuild.",
+      "change": "printf '\\n' >> .github/workflows/pr_validation.yml",
+      "commit": true,
+      "expected": []
+    },
+    {
+      "name": "empty-diff",
+      "description": "No changes at all. Nothing should rebuild.",
+      "change": "true",
+      "commit": false,
+      "expected": []
+    }
+  ]
+}

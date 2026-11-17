@@ -1,87 +1,75 @@
-# build-system-template
-Akka.NET project build system template that provides standardized build and CI/CD configuration for all Akka.NET projects.
+# incrementalist-detection-tests
 
-## Build System Overview
-This repository contains our standardized build system setup that can be used across all Akka.NET projects. Here are the key components and practices we follow:
+Detection-accuracy fixtures for [Incrementalist](https://github.com/petabridge/Incrementalist)'s affected-project analysis.
 
-### CI/CD Configuration
-We primarily use GitHub Actions for our CI/CD pipelines, but also maintain Azure DevOps pipeline examples. You can find the configuration examples in:
-- `.github/workflows/` - GitHub Actions pipeline examples
-- `.azuredevops/` - Azure DevOps pipeline examples
+## Why this exists
 
-### SDK Version Management
-We use `global.json` to pin the .NET SDK version for both CI/CD environments and local development. This ensures consistent builds across all environments and developers.
+A [blog post comparing affected-detection tools](https://stenbrinke.nl/blog/build-only-what-changed-in-your-dotnet-monorepo/) claims Incrementalist's detection "can produce different results from dotnet-affected, sometimes triggering unnecessary runs or skipping runs that were necessary." No corpus, methodology, or numbers were published, so the claim can't be confirmed or refuted as stated.
 
-### .NET Tools
-We use local .NET tools to enhance our build and documentation process. The tools are configured in `.config/dotnet-tools.json` and include:
+This repo is the missing measurement. It is a small, deliberately-shaped .NET solution plus a set of scripted change scenarios, each with a **hand-written expected answer**.
 
-- [Incrementalist](https://github.com/petabridge/Incrementalist) (v1.2.2) - Used for determining which projects need to be rebuilt based on Git changes
-- [DocFx](https://dotnet.github.io/docfx/) (v2.81.0) - Used for generating documentation
+## Ground truth is written by hand, not derived from a tool
 
-To restore these tools in your local environment, run:
-```powershell
+The expected affected set for each scenario lives in `scenarios.json`. It is not produced by Incrementalist, and it is not produced by `dotnet-affected`. Grading one implementation against another only tells you they disagree — not which one is right.
+
+## The fixture solution
+
+Seven projects, shaped so each scenario has a distinct answer:
+
+```
+Core  <-- Shared <-- App
+  ^
+  +---- Core.Tests
+
+Other          (imports build/common.props, no dependency on Core)
+Unrelated      (imports build/common.props, no dependency on Core)
+Unrelated2     (fully isolated)
+```
+
+`build/common.props` is explicitly imported by `Core` and `Unrelated` only. `Directory.Build.targets` is auto-imported into everything.
+
+## Running
+
+```bash
 dotnet tool restore
+./run-scenarios.sh                    # all scenarios
+./run-scenarios.sh resx-at-project-root   # one scenario
 ```
 
-This command is automatically executed in our CI/CD pipelines (both GitHub Actions and Azure DevOps) to ensure tools are available during builds.
+Each scenario resets to `dev`, applies a scripted change, optionally commits it, runs `incrementalist run --dry`, and diffs the result against the expectation. Output lands in `.scenario-output/`.
 
-### Centralized Package and Build Management
-We utilize two key MSBuild files for centralized configuration:
+## Scenarios
 
-1. `Directory.Packages.props` - Implements [Central Package Version Management](https://learn.microsoft.com/nuget/consume-packages/Central-Package-Management) for consistent NuGet package versions across all projects in the solution.
-
-2. `Directory.Build.props` - Defines common build properties, including:
-   - Copyright and author information
-   - Source linking configuration
-   - NuGet package metadata
-   - Common compiler settings
-   - Target framework definitions
-
-### Target Frameworks
-Target frameworks are defined once in `Directory.Build.props` and referenced by name from each project, so a framework bump is a one-line change that flows to every project:
-
-| Property | Value | Used by |
+| Scenario | Change | Expected |
 |---|---|---|
-| `$(NetLibVersion)` | `net10.0` | Libraries and applications |
-| `$(NetTestVersion)` | `net10.0` | Test projects |
-| `$(NetStandardLibVersion)` | `net10.0` | Akka.NET parity / downstream repos |
+| `resx-at-project-root` | `.resx` in the project directory | Core + dependents |
+| `resx-nested-two-levels` | `.resx` in `Resources/en-US/` | Core + dependents |
+| `resx-one-level-deep` | `.resx` in `Resources/` (control) | Core + dependents |
+| `additional-file` | `appsettings.json` as `AdditionalFiles` | App only |
+| `slnx-edited` | `.slnx` touched | full solution |
+| `directory-build-targets` | `Directory.Build.targets` touched | full solution |
+| `unstaged-deletion` | source file deleted, not staged | Core + dependents |
+| `committed-deletion` | source file deleted and committed | Core + dependents |
+| `csproj-property-change` | property added to a leaf `.csproj` | that project only |
+| `props-imported-by-two` | `build/common.props` touched | Core, Unrelated + dependents |
+| `global-json` | SDK pin changed | full solution |
+| `pipeline-yaml-only` | CI workflow touched | nothing |
+| `empty-diff` | no changes | nothing |
 
-Reference them in a project file instead of hardcoding a TFM:
+## Known gaps these scenarios target
 
-```xml
-<TargetFramework>$(NetLibVersion)</TargetFramework>
-```
+Read from Incrementalist 1.2.2 source:
 
-Do not set `TargetFramework` in `Directory.Build.props` itself. A project-level `TargetFramework` overrides it silently, and a project that uses `<TargetFrameworks>` (plural) will fail to build against a singular value defined in props.
+1. **`.slnx` is not solution-wide.** `SolutionWideChangeDetector.AlwaysSolutionWideExtensions` contains only `.sln`, despite `.slnx` support landing in 1.2.0.
+2. **`Directory.Build.targets` is not solution-wide.** The list is `Directory.Build.props`, `Directory.Packages.props`, `global.json`, `nuget.config`.
+3. **`AdditionalDocuments` are never enumerated.** `WorkspaceProject.Documents` only pulls Roslyn `Documents` (source files), so `AdditionalFiles` items are invisible.
+4. **Resource files at the project root are missed.** `FilterAffectedProjectFilesCmd.TryFindSubFolder` enumerates *immediate subdirectories* of each project folder. A file directly in the project directory never matches, and neither does anything two levels deep.
+5. **Unstaged deletions are dropped.** `DiffHelper.ChangedFiles` enumerates `status.Modified`, `status.Added`, `status.Untracked` — never `status.Deleted`.
+6. **`IsWidelyImportedFile` over-triggers.** A props file imported by 2 of 50 projects forces a *full solution* build instead of just those 2 plus dependents.
+7. **`ProjectImportsFinder` only reads `//Import` nodes.** Misses `ImportGroup`, `Sdk` attribute imports, and the implicit `Directory.Build.props` auto-import.
 
-### Code Coverage Configuration
-The `coverlet.runsettings` file configures code coverage collection using Coverlet, with settings for:
-- Multiple coverage report formats (JSON, Cobertura, LCOV, TeamCity, OpenCover)
-- Test assembly exclusions
-- Source linking integration
-- Performance optimizations
+Scenarios 1–6 should fail against 1.2.2. That is the point: this is a failing test suite that documents the gaps, and each fix turns one red.
 
-### Release Management
-Our release process is streamlined through:
-- `RELEASE_NOTES.md` - Contains version history and release notes
-- `build.ps1` - PowerShell script that processes release notes and updates version information
-- Supporting scripts in `/scripts`:
-  - `bumpVersion.ps1` - Updates version numbers
-  - `getReleaseNotes.ps1` - Parses release notes
+## License
 
-The build system primarily relies on standard `dotnet` CLI commands, with the PowerShell scripts mainly handling release note processing and version management.
-
-### Solution Format
-We prefer the new `.slnx` XML-based solution format over the traditional `.sln` format. This requires .NET 9 SDK or later (this template pins .NET 10). The new format is more concise and easier to work with. You can migrate existing solutions using:
-
-```powershell
-dotnet sln migrate
-```
-
-For more information about the new `.slnx` format, see the [official announcement](https://devblogs.microsoft.com/dotnet/introducing-slnx-support-dotnet-cli/).
-
-## Getting Started
-1. Ensure you have the correct .NET SDK version installed (check `global.json`)
-2. Clone this repository
-3. Run `dotnet build` to verify the build system
-4. Customize the configuration files for your specific project needs
+Apache-2.0

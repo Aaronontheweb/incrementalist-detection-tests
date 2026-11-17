@@ -18,9 +18,11 @@
     <NetLibVersion>net10.0</NetLibVersion>
     <NetTestVersion>net10.0</NetTestVersion>
   </PropertyGroup>
-  <ItemGroup>
-    <Using Include="Akka.Event" />
-  </ItemGroup>
+  <!--
+    The template ships <Using Include="Akka.Event" /> here. Removed: these fixture projects
+    deliberately have no Akka dependency, and a global using for a package nobody references
+    fails the build.
+  -->
   <!-- GitHub SourceLink -->
   <ItemGroup>
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />

@@ -1,0 +1,10 @@
+<Project>
+  <!--
+    Intentionally present and intentionally empty.
+
+    MSBuild auto-imports Directory.Build.targets into every project in the tree, so a change
+    here affects the whole solution. Scenario `directory-build-targets` asserts that
+    Incrementalist treats it as solution-wide. It currently does not: SolutionWideChangeDetector
+    only lists Directory.Build.props, Directory.Packages.props, global.json and nuget.config.
+  -->
+</Project>
