@@ -57,6 +57,8 @@ Each scenario resets to `dev`, applies a scripted change, optionally commits it,
 | `global-json` | SDK pin changed | full solution |
 | `pipeline-yaml-only` | CI workflow touched | nothing |
 | `empty-diff` | no changes | nothing |
+| `nested-project-resx` | `.resx` in a nested project | both Outer and Inner |
+| `nested-project-source` | `.cs` in a nested project (control) | Inner only |
 
 ## Known gaps these scenarios target
 
@@ -80,7 +82,15 @@ Read from Incrementalist 1.2.2 source, then **verified by running the suite**. T
 
 - **`ProjectImportsFinder` only reads `//Import` nodes.** Misses `ImportGroup`, `Sdk` attribute imports, and the implicit `Directory.Build.props` auto-import. No scenario covers this yet.
 
-## Current status against Incrementalist 1.2.2 and dotnet-affected 7.0.1
+## Current status
+
+### Against the fixed build (branch `fix/547-detection-gaps`)
+
+```
+15 passed, 0 failed
+```
+
+### Against Incrementalist 1.2.2 and dotnet-affected 7.0.1
 
 ```
 SCENARIO                        incrementalist    dotnet-affected
@@ -98,15 +108,17 @@ props-imported-by-two           PASS              PASS
 global-json                     PASS              FAIL
 pipeline-yaml-only              PASS              PASS
 empty-diff                      PASS              PASS
+nested-project-resx             FAIL              FAIL
+nested-project-source           PASS              PASS
 
-TOTALS                          7 pass / 6 fail   11 pass / 2 fail
+TOTALS                          8 pass / 7 fail   12 pass / 3 fail
 ```
 
-Neither tool is correct. They fail on **disjoint** sets of scenarios, which is the most useful thing this suite produces.
+Neither released tool is correct. They fail on **disjoint** sets of scenarios, which is the most useful thing this suite produces.
 
-### Incrementalist's six failures — all false negatives
+### Incrementalist 1.2.2's seven failures — all false negatives
 
-Every one reports **zero** affected projects when work is genuinely needed. That is the dangerous direction: a skipped build ships stale code.
+Every one reports **zero** affected projects when work is genuinely needed, except `nested-project-resx`, which reports the *wrong* project. That is worse: a silent misattribution looks like a sensible answer.
 
 1. `resx-at-project-root` — `.resx` in the project directory
 2. `resx-nested-two-levels` — `.resx` in `Resources/en-US/`
@@ -114,28 +126,44 @@ Every one reports **zero** affected projects when work is genuinely needed. That
 4. `directory-build-targets` — `Directory.Build.targets`
 5. `unstaged-deletion` — source file deleted, not staged
 6. `committed-deletion` — source file deleted and committed
+7. `nested-project-resx` — `.resx` in a nested project, attributed to the outer project
 
-### dotnet-affected's two failures — also false negatives
+### dotnet-affected's three failures — also false negatives
 
-1. `slnx-edited` — editing the `.slnx` solution file returns nothing. Verified independently: `dotnet-affected --from dev` reports "No affected projects where found" after a committed `.slnx` change.
+1. `slnx-edited` — editing the `.slnx` solution file returns nothing. Verified independently.
 2. `global-json` — editing `global.json` returns nothing. Same independent verification.
-
-Both are solution-wide files that dotnet-affected does not treat as global triggers. Incrementalist handles both correctly.
+3. `nested-project-resx` — same misattribution as Incrementalist.
 
 ### Where each tool wins
 
 | Concern | Winner |
 |---|---|
-| Resource files (`.resx`) at any depth | dotnet-affected |
-| `AdditionalFiles` items | dotnet-affected |
-| `Directory.Build.targets` | dotnet-affected |
-| File deletions (staged or committed) | dotnet-affected |
+| Resource files (`.resx`) at any depth | fixed Incrementalist |
+| `AdditionalFiles` items | fixed Incrementalist |
+| `Directory.Build.targets` | fixed Incrementalist |
+| File deletions (staged or committed) | fixed Incrementalist |
 | `.slnx` solution file changes | Incrementalist |
 | `global.json` changes | Incrementalist |
+| Nested projects | fixed Incrementalist |
 | `.csproj` property changes | tie |
 | Props imported by a subset of projects | tie |
 | Non-code files (CI YAML) | tie |
 | Empty diff | tie |
+
+## Validating a candidate build
+
+`run-candidate.sh` runs the suite against a locally built Incrementalist instead of the pinned 1.2.2:
+
+```bash
+# from the Incrementalist repo
+dotnet pack src/Incrementalist.Cmd/Incrementalist.Cmd.csproj -c Release -o /tmp/pkg
+dotnet tool install --tool-path /tmp/candidate --add-source /tmp/pkg Incrementalist.Cmd --version 1.2.2
+
+# from this repo
+CANDIDATE=/tmp/candidate/incrementalist ./run-candidate.sh
+```
+
+> **Note:** on hosts where .NET lives outside the default location, the candidate apphost needs `DOTNET_ROOT` set. The runner defaults it to `$HOME/.dotnet`.
 
 ## A note on fairness
 
