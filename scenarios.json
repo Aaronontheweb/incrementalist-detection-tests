@@ -6,7 +6,9 @@
     "src/Other/Other.csproj",
     "src/Unrelated/Unrelated.csproj",
     "src/Unrelated2/Unrelated2.csproj",
-    "src/Core.Tests/Core.Tests.csproj"
+    "src/Core.Tests/Core.Tests.csproj",
+    "src/Outer/Outer.csproj",
+    "src/Outer/Inner/Inner.csproj"
   ],
   "scenarios": [
     {
@@ -134,6 +136,25 @@
       "change": "true",
       "commit": false,
       "expected": []
+    },
+    {
+      "name": "nested-project-resx",
+      "description": "A .resx inside a project nested within another project's directory, where the outer project excludes Inner/**. The old fallback returned only Outer -- a silent misattribution, worse than a miss. Both projects are returned now because containment is lexical and considers every containing project.",
+      "change": "sed -i 's/Hello/Hello2/' src/Outer/Inner/InnerStrings.resx",
+      "commit": true,
+      "expected": [
+        "src/Outer/Outer.csproj",
+        "src/Outer/Inner/Inner.csproj"
+      ]
+    },
+    {
+      "name": "nested-project-source",
+      "description": "A .cs file in the nested project. This path goes through the document inventory rather than the containment fallback, so it was already correct before the fix. Kept as a control.",
+      "change": "sed -i 's/Value => 2/Value => 3/' src/Outer/Inner/InnerThing.cs",
+      "commit": true,
+      "expected": [
+        "src/Outer/Inner/Inner.csproj"
+      ]
     }
   ]
 }

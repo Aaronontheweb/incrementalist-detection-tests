@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(NetLibVersion)</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- Realistic nested-project setup: the outer project excludes the nested directory. -->
+  <ItemGroup>
+    <Compile Remove="Inner/**" />
+    <EmbeddedResource Remove="Inner/**" />
+    <None Remove="Inner/**" />
+  </ItemGroup>
+</Project>

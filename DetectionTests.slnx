@@ -14,4 +14,6 @@
   <Project Path="src/Unrelated/Unrelated.csproj" />
   <Project Path="src/Unrelated2/Unrelated2.csproj" />
   <Project Path="src/Core.Tests/Core.Tests.csproj" />
+  <Project Path="src/Outer/Outer.csproj" />
+  <Project Path="src/Outer/Inner/Inner.csproj" />
 </Solution>
