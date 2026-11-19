@@ -1,0 +1,30 @@
+info: Incrementalist.Cmd.Program[0]
+      Starting analysis of solution: DetectionTests.slnx
+info: Incrementalist.Cmd.Program[0]
+      Beginning dependency analysis...
+info: Incrementalist.Cmd.Program[0]
+      [EmitDependencyGraphTask]Opening solution /home/petabridge/repositories/Aaronontheweb/incrementalist-detection-tests/DetectionTests.slnx...
+info: Incrementalist.Cmd.Program[0]
+      [EmitDependencyGraphTask]Solution opened successfully. Gathering solution files...
+info: Incrementalist.Cmd.Program[0]
+      [EmitDependencyGraphTask]Found 17 files in solution
+info: Incrementalist.Cmd.Program[0]
+      [EmitDependencyGraphTask]Analyzing Git changes...
+info: Incrementalist.Cmd.Program[0]
+      [EmitDependencyGraphTask]Found 1 affected files
+info: Incrementalist.Cmd.Program[0]
+      [EmitDependencyGraphTask]Modified files breakdown: 1 source files, 0 project files, 0 solution files, 0 script files, 0 other files
+info: Incrementalist.Cmd.Program[0]
+      [EmitDependencyGraphTask]Analyzing solution-wide impact...
+info: Incrementalist.Cmd.Program[0]
+      [EmitDependencyGraphTask]Incremental build possible. 1 projects [/home/petabridge/repositories/Aaronontheweb/incrementalist-detection-tests/src/Outer/Inner/Inner.csproj] need to be rebuilt
+info: Incrementalist.Cmd.Program[0]
+      Solution analysis completed in 0:00:00.702439
+info: Incrementalist.Cmd.Program[0]
+      Calculating dry run....
+info: Incrementalist.Cmd.Program[0]
+      Incremental build required:
+info: Incrementalist.Cmd.Program[0]
+      1 affected projects: /home/petabridge/repositories/Aaronontheweb/incrementalist-detection-tests/src/Outer/Inner/Inner.csproj
+info: Incrementalist.Cmd.Program[0]
+      Writing to output file: /home/petabridge/repositories/Aaronontheweb/incrementalist-detection-tests/.scenario-output-candidate/nested-project-source.raw

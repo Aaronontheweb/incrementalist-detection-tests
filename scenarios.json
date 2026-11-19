@@ -138,6 +138,15 @@
       "expected": []
     },
     {
+      "name": "additional-file-external",
+      "description": "An AdditionalFiles item that lives OUTSIDE every project directory (build/shared-settings.json, registered by App). Containment cannot attribute this path, so only the AdditionalFiles adapter can. This is the scenario that actually protects the adapter changes -- the in-project additional-file case passes on containment alone.",
+      "change": "sed -i 's/Information/Debug/' build/shared-settings.json",
+      "commit": true,
+      "expected": [
+        "src/App/App.csproj"
+      ]
+    },
+    {
       "name": "nested-project-resx",
       "description": "A .resx inside a project nested within another project's directory, where the outer project excludes Inner/**. The old fallback returned only Outer -- a silent misattribution, worse than a miss. Both projects are returned now because containment is lexical and considers every containing project.",
       "change": "sed -i 's/Hello/Hello2/' src/Outer/Inner/InnerStrings.resx",

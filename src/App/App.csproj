@@ -12,6 +12,9 @@
 
   <ItemGroup>
     <AdditionalFiles Include="appsettings.json" />
+    <!-- Lives outside every project directory, so containment cannot attribute it.
+         Only the AdditionalFiles adapter can. -->
+    <AdditionalFiles Include="../../build/shared-settings.json" />
   </ItemGroup>
 
 </Project>
