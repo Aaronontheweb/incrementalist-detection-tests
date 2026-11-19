@@ -65,7 +65,7 @@ for ((i = 0; i < scenario_count; i++)); do
 
   raw="$OUT_DIR/$name.raw"
   rm -f "$raw"
-  "$CANDIDATE" run --dry -b "$BASE_BRANCH" -f "$raw" >"$OUT_DIR/$name.log" 2>&1
+  DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}" "$CANDIDATE" run --dry -b "$BASE_BRANCH" -f "$raw" >"$OUT_DIR/$name.log" 2>&1
   rc=$?
 
   if [[ $rc -ne 0 ]]; then
